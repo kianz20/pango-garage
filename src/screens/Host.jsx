@@ -126,6 +126,13 @@ export default function Host() {
     return (
       <main className="shell host-lobby">
         <header className="host-lobby__head">
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm btn--back"
+            onClick={() => navigate('/')}
+          >
+            ← Back
+          </button>
           <p className="eyebrow">Pango Garage</p>
           <h1>Scan to join</h1>
         </header>

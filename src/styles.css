@@ -126,6 +126,9 @@ h2 {
   padding: 8px 14px;
   font-size: 0.85rem;
 }
+.btn--back {
+  justify-self: start;
+}
 .btn:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 2px;

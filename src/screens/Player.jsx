@@ -12,6 +12,7 @@ import RankList from '../components/RankList.jsx';
 import Timer from '../components/Timer.jsx';
 import Leaderboard from '../components/Leaderboard.jsx';
 import AnswerComparison from '../components/AnswerComparison.jsx';
+import { navigate } from '../router.js';
 
 const POSITION_LABELS = ['1st', '2nd', '3rd', '4th'];
 
@@ -166,6 +167,13 @@ export default function Player({ initialCode = '' }) {
             join({ code: code.trim().toUpperCase(), name: name.trim() });
           }}
         >
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm btn--back"
+            onClick={() => navigate('/')}
+          >
+            ← Back
+          </button>
           <p className="eyebrow">Pango Garage</p>
           <h1>Join the game</h1>
 
