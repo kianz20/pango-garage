@@ -23,6 +23,11 @@ export default function Host() {
         const resumed = await ask('host:resume', { code: existing });
         if (resumed.ok) {
           setState(resumed.state);
+          if (resumed.round) {
+            syncClock(resumed.round.serverNow);
+            setRound(resumed.round);
+          }
+          if (resumed.reveal) setReveal(resumed.reveal);
           return;
         }
       }
@@ -150,9 +155,6 @@ export default function Host() {
             >
               Start · {state.totalRounds} rounds
             </button>
-            <p className="muted small">
-              Eight rounds of four cars. Roughly five minutes. Nobody needs an account.
-            </p>
           </section>
         </div>
       </main>

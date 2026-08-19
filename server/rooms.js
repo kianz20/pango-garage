@@ -80,6 +80,44 @@ const playerList = (room) =>
     connected: p.connected,
   }));
 
+/**
+ * round:start / round:reveal are one-time broadcasts, so a socket that (re)joins the room
+ * mid-round or mid-reveal — a phone reload, a host tab losing wifi — never receives one and
+ * gets stuck with no round to render. Resume/join acks call this to hand the same payload
+ * to a late socket.
+ */
+export function currentRoundPayload(room) {
+  const round = room.rounds[room.roundIndex];
+  if (!round) return {};
+
+  if (room.phase === 'round') {
+    return {
+      round: {
+        ...publicRound(round, {
+          totalRounds: room.rounds.length,
+          endsAt: room.endsAt,
+          durationMs: CONFIG.roundMs,
+        }),
+        serverNow: Date.now(),
+      },
+    };
+  }
+
+  if (room.phase === 'reveal') {
+    return {
+      reveal: {
+        reveal: revealRound(round),
+        results: room.lastResults,
+        leaderboard: rankPlayers(playerList(room)),
+        maxPairs: pairCount(LINEUP_SIZE),
+        isFinalRound: room.roundIndex >= room.rounds.length - 1,
+      },
+    };
+  }
+
+  return {};
+}
+
 export function stateFor(room) {
   return {
     code: room.code,

@@ -19,6 +19,7 @@ import {
   resetToLobby,
   stateFor,
   pushState,
+  currentRoundPayload,
 } from './rooms.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -58,7 +59,7 @@ io.on('connection', (socket) => {
     room.hostSeenAt = Date.now();
     hostedCode = room.code;
     socket.join(room.code);
-    ack?.({ ok: true, state: stateFor(room), config: CONFIG });
+    ack?.({ ok: true, state: stateFor(room), config: CONFIG, ...currentRoundPayload(room) });
   });
 
   socket.on('host:start', (_payload, ack) => {
@@ -106,6 +107,7 @@ io.on('connection', (socket) => {
       rejoined: !!result.rejoined,
       state: stateFor(room),
       config: CONFIG,
+      ...currentRoundPayload(room),
     });
   });
 

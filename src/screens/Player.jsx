@@ -52,6 +52,11 @@ export default function Player({ initialCode = '' }) {
     setError(null);
     setMe({ playerId: res.playerId, name: res.name });
     setState(res.state);
+    if (res.round) {
+      syncClock(res.round.serverNow);
+      setRound(res.round);
+    }
+    if (res.reveal) setReveal(res.reveal);
     saveSession({ code: payload.code, name: res.name, playerId: res.playerId });
     return true;
   };
