@@ -5,7 +5,7 @@ screen and asks one of thirteen questions, then players drag the cars into order
 phones. No multiple choice, no typing, no question authoring.
 
 Eight rounds drawn from **217 cars** and **13 categories**. Up to 20 players. Join by QR
-code, no accounts.
+code.
 
 | Category | Ranks by |
 | --- | --- |
