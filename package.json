@@ -1,0 +1,38 @@
+{
+  "name": "pango-garage",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Ranking Lineup — a 5-minute party game that tests car knowledge",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "concurrently -n server,client -c cyan,magenta \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "nodemon --quiet --watch server --watch shared --ext js server/index.js",
+    "dev:client": "vite",
+    "build": "vite build",
+    "start": "node server/index.js",
+    "verify": "node scripts/verify-data.js && node scripts/verify-engine.js",
+    "verify:data": "node scripts/verify-data.js",
+    "verify:engine": "node scripts/verify-engine.js"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.1.0",
+    "@dnd-kit/modifiers": "^7.0.0",
+    "@dnd-kit/sortable": "^8.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "express": "^4.19.2",
+    "qrcode": "^1.5.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "socket.io": "^4.7.5",
+    "socket.io-client": "^4.7.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "concurrently": "^8.2.2",
+    "nodemon": "^3.1.4",
+    "vite": "^5.4.0"
+  }
+}
