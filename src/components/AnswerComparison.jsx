@@ -4,12 +4,12 @@ import { discordantPairs } from '../../shared/scoring.js';
 const POSITION_LABELS = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
 
 /**
- * The end-of-round comparison: the true order, with where the player actually put each car
- * and the stat that decided it.
+ * The end-of-round comparison: the true order, with where the player actually put each
+ * item and the stat that decided it.
  *
  * One list rather than two side by side — on a phone, two columns forces you to read
- * across, and the thing you want to see is "which cars did I misplace", which reads best as
- * annotations on the correct answer.
+ * across, and the thing you want to see is "which items did I misplace", which reads best
+ * as annotations on the correct answer.
  */
 export default function AnswerComparison({ reveal, myOrder = [], statLabel }) {
   const answered = myOrder.length > 0;
