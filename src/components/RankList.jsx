@@ -20,9 +20,9 @@ import { CSS } from '@dnd-kit/utilities';
 
 const POSITION_LABELS = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
 
-function Row({ car, index, count, onNudge, disabled }) {
+function Row({ item, index, count, onNudge, disabled }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: car.id, disabled });
+    useSortable({ id: item.id, disabled });
 
   return (
     <li
@@ -33,18 +33,18 @@ function Row({ car, index, count, onNudge, disabled }) {
       {...listeners}
     >
       <span className="rank-row__pos">{POSITION_LABELS[index]}</span>
-      <span className="rank-row__car">
-        <span className="rank-row__make">{car.make}</span>
-        <span className="rank-row__model">
-          {car.model}
-          {car.year != null && <span className="rank-row__year"> · {car.year}</span>}
+      <span className="rank-row__item">
+        {item.subtitle != null && <span className="rank-row__subtitle">{item.subtitle}</span>}
+        <span className="rank-row__title">
+          {item.title}
+          {item.meta != null && <span className="rank-row__meta"> · {item.meta}</span>}
         </span>
       </span>
       <span className="rank-row__nudge">
         <button
           type="button"
           className="nudge"
-          aria-label={`Move ${car.make} ${car.model} up`}
+          aria-label={`Move ${item.title} up`}
           disabled={disabled || index === 0}
           // Buttons live inside a draggable row, so keep the drag sensors out of it.
           onPointerDown={(e) => e.stopPropagation()}
@@ -56,7 +56,7 @@ function Row({ car, index, count, onNudge, disabled }) {
         <button
           type="button"
           className="nudge"
-          aria-label={`Move ${car.make} ${car.model} down`}
+          aria-label={`Move ${item.title} down`}
           disabled={disabled || index === count - 1}
           onPointerDown={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
@@ -76,14 +76,14 @@ function Row({ car, index, count, onNudge, disabled }) {
  * The controller. Drag to reorder, or use the arrows — phones vary wildly in how well
  * they handle drag gestures, and the arrows are also the keyboard/screen-reader path.
  */
-export default function RankList({ cars, order, onChange, disabled = false }) {
+export default function RankList({ items: pool, order, onChange, disabled = false }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  const byId = new Map(cars.map((c) => [c.id, c]));
+  const byId = new Map(pool.map((it) => [it.id, it]));
   const items = order.map((id) => byId.get(id)).filter(Boolean);
 
   const handleDragEnd = ({ active, over }) => {
@@ -109,10 +109,10 @@ export default function RankList({ cars, order, onChange, disabled = false }) {
     >
       <SortableContext items={order} strategy={verticalListSortingStrategy}>
         <ol className="rank-list">
-          {items.map((car, i) => (
+          {items.map((item, i) => (
             <Row
-              key={car.id}
-              car={car}
+              key={item.id}
+              item={item}
               index={i}
               count={items.length}
               onNudge={nudge}

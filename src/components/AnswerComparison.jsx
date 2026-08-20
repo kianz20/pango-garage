@@ -14,9 +14,11 @@ const POSITION_LABELS = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
 export default function AnswerComparison({ reveal, myOrder = [], statLabel }) {
   const answered = myOrder.length > 0;
   const myRank = new Map(myOrder.map((id, i) => [id, i]));
-  const nameOf = new Map(reveal.correctOrder.map((c) => [c.id, `${c.make} ${c.model}`]));
+  const nameOf = new Map(
+    reveal.correctOrder.map((it) => [it.id, it.subtitle ? `${it.subtitle} ${it.title}` : it.title])
+  );
 
-  const correctIds = reveal.correctOrder.map((c) => c.id);
+  const correctIds = reveal.correctOrder.map((it) => it.id);
   const wrongPairs = answered ? discordantPairs(myOrder, correctIds) : [];
 
   return (
@@ -27,26 +29,26 @@ export default function AnswerComparison({ reveal, myOrder = [], statLabel }) {
       </div>
 
       <ol className="compare__list">
-        {reveal.correctOrder.map((car, i) => {
-          const yours = myRank.get(car.id);
+        {reveal.correctOrder.map((item, i) => {
+          const yours = myRank.get(item.id);
           const exact = yours === i;
           return (
             <li
-              key={car.id}
+              key={item.id}
               className={`compare__row${answered ? (exact ? ' is-right' : ' is-wrong') : ''}`}
               style={{ animationDelay: `${i * 160}ms` }}
             >
               <span className="compare__pos">{POSITION_LABELS[i]}</span>
-              <span className="compare__car">
-                <span className="compare__make">{car.make}</span>
-                <span className="compare__model">
-                  {car.model}
-                  {car.year != null && (
-                    <span className="compare__year"> ’{String(car.year).slice(2)}</span>
+              <span className="compare__item">
+                {item.subtitle != null && <span className="compare__subtitle">{item.subtitle}</span>}
+                <span className="compare__title">
+                  {item.title}
+                  {item.meta != null && (
+                    <span className="compare__meta"> ’{String(item.meta).slice(2)}</span>
                   )}
                 </span>
               </span>
-              <span className="compare__value">{car.value}</span>
+              <span className="compare__value">{item.value}</span>
               {answered && (
                 <span className={`compare__yours${exact ? ' is-right' : ''}`}>
                   {exact ? '✓' : `you: ${POSITION_LABELS[yours] ?? '—'}`}

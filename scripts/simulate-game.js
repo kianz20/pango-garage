@@ -14,6 +14,7 @@
  * Reveals are host-paced, so this script also plays the host pressing "next" (HOST_PACE_MS).
  */
 import { io } from 'socket.io-client';
+import { CATEGORY_BY_FQKEY } from '../shared/decks/index.js';
 
 const URL = process.env.URL || 'http://localhost:3000';
 const PLAYER_COUNT = Number(process.env.PLAYERS || 20);
@@ -31,8 +32,8 @@ const emit = (socket, event, payload = {}) =>
   new Promise((resolve) => socket.timeout(8000).emit(event, payload, (err, res) => resolve(err ? { error: String(err) } : res)));
 
 /** Shuffle, then partially sort toward the truth to fake a given skill level. */
-function guessOrder(cars, skill) {
-  const order = cars.map((c) => c.id);
+function guessOrder(items, skill) {
+  const order = items.map((it) => it.id);
   for (let i = order.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [order[i], order[j]] = [order[j], order[i]];
@@ -66,7 +67,7 @@ async function main() {
       const delay = Math.round((1 - skill) * round.durationMs * 0.7);
       setTimeout(() => {
         emit(socket, 'player:submit', {
-          order: guessOrder(round.cars, skill),
+          order: guessOrder(round.items, skill),
           roundIndex: round.index,
         });
       }, delay);
@@ -85,17 +86,19 @@ async function main() {
     extra.close();
   }
 
-  // Verify no stat values leak to clients. `year` is expected except on an age round,
+  // Verify no stat values leak to clients. `meta` is expected except on a hidesMeta round,
   // where the whole point of the category is that it's hidden.
   await new Promise((resolve) => {
     host.once('round:start', (round) => {
-      const isAgeRound = ['oldest', 'newest'].includes(round.category.key);
-      const allowed = isAgeRound ? ['id', 'make', 'model'] : ['id', 'make', 'model', 'year'];
-      const leaked = Object.keys(round.cars[0]).filter((k) => !allowed.includes(k));
+      const category = CATEGORY_BY_FQKEY.get(round.category.key);
+      const allowed = category.hidesMeta
+        ? ['id', 'title', 'subtitle']
+        : ['id', 'title', 'subtitle', 'meta'];
+      const leaked = Object.keys(round.items[0]).filter((k) => !allowed.includes(k));
       log(
         leaked.length
           ? `!! round payload leaks: ${leaked.join(', ')}`
-          : `Round payload OK (${round.category.key}${isAgeRound ? ', year hidden' : ', year shown'}).`
+          : `Round payload OK (${round.category.key}${category.hidesMeta ? ', meta hidden' : ', meta shown'}).`
       );
       resolve();
     });

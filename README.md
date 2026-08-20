@@ -1,28 +1,36 @@
-# Pango Garage — Ranking Lineup
+# PangoRankr
 
-A five-minute party game that tests car knowledge. Every round puts four cars on the big
-screen and asks one of thirteen questions, then players drag the cars into order on their
-phones. No multiple choice, no typing, no question authoring.
+A five-minute party game. Every round puts four items on the big screen and asks one
+question — fastest, priciest, most sugar, closest to winning the World Cup — and players
+drag them into order on their phones. No multiple choice, no typing, no question authoring.
 
-Eight rounds drawn from **217 cars** and **13 categories**. Up to 20 players. Join by QR
-code.
+The host picks which categories are in play from a checklist in the lobby, across eight
+topics — **Cars**, **Phones**, **Geography**, **Film & Music**, **Food & Drink**,
+**FIFA World Cup**, **Rugby World Cup**, and **Olympics** — and a game freely mixes rounds
+from whichever topics were selected. Each topic lives in its own file under
+[shared/decks/](shared/decks/); see [shared/decks/cars.js](shared/decks/cars.js) for the
+car pool (217 cars, 13 categories) and the deepest documentation, since every other deck
+follows the same shape.
 
-| Category | Ranks by |
+| Topic | Categories |
 | --- | --- |
-| Quickest / Highest top speed | 0–100 km/h · top speed |
-| Most powerful / Best power-to-weight | horsepower · hp per tonne |
-| Biggest engine / Most power per litre | displacement · hp per litre |
-| Most expensive / Cheapest (as new) | launch-day sticker price, NOT inflation-adjusted |
-| Most expensive (adjusted) | launch price compounded to today's dollars — see below |
-| Heaviest / Lightest | curb weight |
-| Oldest / Newest | when the nameplate first launched (not this exact car's spec year) |
+| Cars | quickest / top speed / power / power-to-weight / engine size / power-per-litre / price (as new, cheapest, priciest, inflation-adjusted) / weight / oldest / newest |
+| Phones | launch price (cheapest, priciest) / release year / screen resolution |
+| Geography | population / land area / GDP / tallest mountain |
+| Film & Music | box office / budget / runtime / album sales |
+| Food & Drink | sugar per serving |
+| FIFA World Cup (1998+) | year won / closest to winning (that tournament's Final Four) |
+| Rugby World Cup (1995+) | year won / closest to winning (that tournament's Final Four) |
+| Olympics (1996+) | most gold / silver / bronze medals (within one Olympics only) |
 
-Three categories touch price, and their titles say outright whether they're adjusted —
-"Most expensive first — NOT inflation-adjusted" vs "— ADJUSTED to `<year>` dollars" — so it's
-never ambiguous which dollars are on screen.
+Cricket and NBA basketball were considered and dropped: neither plays a real bronze-medal
+match, so "closest to winning" always ties two teams on the same eliminated-in-the-semis
+stage — an unanswerable round (see [shared/decks/fifa.js](shared/decks/fifa.js) for why
+that matters). FIFA/Rugby/Olympics are all deliberately scoped to recent history (1995+)
+rather than the full record.
 
-Two categories sharing an underlying quantity never land back to back, so a game can't ask
-"heaviest" and then immediately "lightest".
+Categories that share an underlying quantity (e.g. cars' heaviest/lightest) never land back
+to back in a game, so it can't ask the same thing twice in a row.
 
 ## Why ranking works
 
@@ -107,16 +115,23 @@ shared store, or players will land on a different instance than their host.
 ## Layout
 
 ```
-shared/cars.js         the car pool — 217 cars, 66 makes, 1948-2024
-shared/categories.js   the twelve ranking questions, their axis and eligibility
+shared/decks/cars.js       the car pool + its 13 categories (the reference deck — most documented)
+shared/decks/phones.js     phone pool + categories
+shared/decks/geography.js  country pool + categories
+shared/decks/filmMusic.js  movie + album pools + categories
+shared/decks/food.js       food/drink pool + categories
+shared/decks/fifa.js       FIFA World Cup edition + final-four pools + categories
+shared/decks/rugby.js      Rugby World Cup edition + final-four pools + categories
+shared/decks/olympics.js   Olympics medal-table pool + categories (grouped per Games)
+shared/decks/index.js      the deck registry: ALL_CATEGORIES, CATEGORY_BY_FQKEY, CATEGORY_GROUPS
 shared/rounds.js       round generation, difficulty ramp, client-safe payloads
 shared/scoring.js      Kendall tau scoring and leaderboard ranking
 server/rooms.js        the game engine: rooms, phases, timers, scoring
 server/index.js        express + socket.io wiring, static hosting
-src/screens/Host.jsx   the big screen
+src/screens/Host.jsx   the big screen (includes the lobby category picker)
 src/screens/Player.jsx the phone controller
 src/components/AnswerComparison.jsx  end-of-round "your order vs the answer"
-scripts/verify-data.js    data + generator + scoring checks
+scripts/verify-data.js    data + generator + scoring checks, across every deck
 scripts/verify-engine.js  drives the real engine, asserts a perfect answer scores 6/6
 scripts/simulate-game.js  end-to-end 20-player smoke test
 ```

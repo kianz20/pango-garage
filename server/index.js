@@ -62,11 +62,11 @@ io.on('connection', (socket) => {
     ack?.({ ok: true, state: stateFor(room), config: CONFIG, ...currentRoundPayload(room) });
   });
 
-  socket.on('host:start', (_payload, ack) => {
+  socket.on('host:start', ({ categoryKeys } = {}, ack) => {
     const room = getRoom(hostedCode);
     if (!room) return ack?.({ error: 'No game to start.' });
     if (room.players.size === 0) return ack?.({ error: 'Nobody has joined yet.' });
-    startGame(room);
+    startGame(room, { categoryKeys });
     ack?.({ ok: true });
   });
 
@@ -138,7 +138,7 @@ io.on('connection', (socket) => {
 setInterval(() => sweepRooms(), 60_000).unref();
 
 server.listen(PORT, () => {
-  console.log(`Pango Garage listening on http://localhost:${PORT}`);
+  console.log(`PangoRankr listening on http://localhost:${PORT}`);
 });
 
 // Exported for tests / scripts that want to drive the engine without a socket.

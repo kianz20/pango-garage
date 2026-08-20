@@ -7,7 +7,7 @@
  *
  * Run: npm run verify:engine
  */
-import { CATEGORY_BY_KEY } from '../shared/categories.js';
+import { CATEGORY_BY_FQKEY } from '../shared/decks/index.js';
 
 // A long answering clock: this test never waits on a timer, it calls advance() to step the
 // game, so the engine's own round timeout must never fire and race us.
@@ -53,15 +53,15 @@ for (let i = 0; i < CONFIG.totalRounds; i++) {
   if (!round) break;
 
   const sent = io.latest('round:start');
-  const category = CATEGORY_BY_KEY.get(round.categoryKey);
+  const category = CATEGORY_BY_FQKEY.get(round.categoryKey);
 
-  // What the client is told, versus the truth the server holds. `year` is allowed EXCEPT
-  // on an age round, where it would hand over the answer outright.
-  const allowed = category.axis === 'year' ? ['id', 'make', 'model'] : ['id', 'make', 'model', 'year'];
-  const leaks = Object.keys(sent.cars[0]).filter((k) => !allowed.includes(k));
-  if (leaks.length) fail(`round ${i} (${category.key}) payload leaks ${leaks.join(', ')}`);
-  if (category.axis === 'year' && sent.cars.some((c) => 'year' in c)) {
-    fail(`round ${i} is an age round but still sends year`);
+  // What the client is told, versus the truth the server holds. `meta` is allowed EXCEPT
+  // on a hidesMeta round, where it would hand over the answer outright.
+  const allowed = category.hidesMeta ? ['id', 'title', 'subtitle'] : ['id', 'title', 'subtitle', 'meta'];
+  const leaks = Object.keys(sent.items[0]).filter((k) => !allowed.includes(k));
+  if (leaks.length) fail(`round ${i} (${category.fqKey}) payload leaks ${leaks.join(', ')}`);
+  if (category.hidesMeta && sent.items.some((it) => 'meta' in it)) {
+    fail(`round ${i} hides meta but still sends it`);
   }
 
   // Submit the exact correct order, verbatim from the server's own answer.
@@ -87,7 +87,7 @@ for (let i = 0; i < CONFIG.totalRounds; i++) {
 
   if (p.concordant !== reveal.maxPairs || !p.perfect) {
     fail(
-      `round ${i} (${category.key}): exact correct order scored ${p.concordant}/${reveal.maxPairs}, perfect=${p.perfect}`
+      `round ${i} (${category.fqKey}): exact correct order scored ${p.concordant}/${reveal.maxPairs}, perfect=${p.perfect}`
     );
   }
   if (s.concordant !== reveal.maxPairs - 1) {

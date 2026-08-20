@@ -1,7 +1,7 @@
 /**
- * The car pool.
+ * The car deck: item pool + categories.
  *
- * Fields
+ * Fields (per car)
  *   id            stable slug, used as the drag-item key
  *   make          manufacturer
  *   model         model / trim as people would say it out loud
@@ -29,9 +29,9 @@
  *                 true when "make + model" alone doesn't identify one real car — e.g.
  *                 "Bentley Continental GT" spans three generations (2003-2025) with very
  *                 different specs. The round view shows the year for every category except
- *                 oldest/newest (see publicRound() in rounds.js), which resolves this for
- *                 those categories: knowing "this is the 2003 one" tells you exactly which
- *                 car is meant.
+ *                 oldest/newest (categories below), which resolves this for those
+ *                 categories: knowing "this is the 2003 one" tells you exactly which car is
+ *                 meant.
  *   firstYear     for an ambiguousNameplate car, the year the NAMEPLATE first launched, if
  *                 that differs from `year` (the specific variant these specs describe). The
  *                 oldest/newest categories ask "which of these has existed longest", not
@@ -58,10 +58,10 @@
  * IMPORTANT — these numbers are rounded, single-variant approximations chosen for
  * gameplay, not a spec database. Real cars vary by trim, market, and model year, and
  * launch prices are nominal so a 1965 car looks "cheap" next to a 2015 one. Rounds are
- * generated with a minimum-gap rule (see rounds.js) so the ordering never hinges on a
- * difference small enough for this imprecision to make an answer wrong.
+ * generated with a minimum-gap rule (see shared/rounds.js) so the ordering never hinges on
+ * a difference small enough for this imprecision to make an answer wrong.
  *
- * To swap in a live API later, replace this module's default export with your adapter's
+ * To swap in a live API later, replace this module's CARS export with your adapter's
  * output in the same shape. Nothing else in the game reads car data directly.
  */
 
@@ -165,7 +165,6 @@ export const CARS = [
   { id: 'noble-m600-2010', make: 'Noble', model: 'M600', year: 2010, hp: 650, accelSec: 3.0, topSpeedMph: 225, priceUsd: 330000, kg: 1198, litres: 4.4, fame: 1, verified: true },
   { id: 'caterham-620r-2013', make: 'Caterham', model: 'Seven 620R', year: 2013, hp: 310, accelSec: 2.8, topSpeedMph: 155, priceUsd: 78000, kg: 572, litres: 2.0, fame: 2, verified: true },
   { id: 'ariel-atom3-2007', make: 'Ariel', model: 'Atom 3', year: 2007, hp: 245, accelSec: 3.3, topSpeedMph: 155, priceUsd: 60000, kg: 520, litres: 2.0, fame: 2, verified: true },
-  { id: 'morgan-3wheeler-2011', make: 'Morgan', model: '3 Wheeler', year: 2011, hp: 82, accelSec: 6.0, topSpeedMph: 115, priceUsd: 60000, kg: 525, litres: 2.0, fame: 2, verified: true },
   { id: 'mini-cooper-s-1963', make: 'Mini', model: 'Cooper S', year: 1963, hp: 70, accelSec: 11.2, topSpeedMph: 96, priceUsd: 1500, kg: 640, litres: 1.1, fame: 4, verified: true },
   { id: 'mini-cooper-s-r53-2002', make: 'Mini', model: 'Cooper S (R53)', year: 2002, hp: 163, accelSec: 7.2, topSpeedMph: 135, priceUsd: 19999, kg: 1160, litres: 1.6, fame: 4, verified: true },
   { id: 'mini-jcw-gp-2020', make: 'Mini', model: 'John Cooper Works GP', year: 2020, hp: 302, accelSec: 5.2, topSpeedMph: 165, priceUsd: 45000, kg: 1334, litres: 2.0, fame: 2, verified: true },
@@ -300,4 +299,221 @@ export const CARS = [
 
 export const CARS_BY_ID = new Map(CARS.map((c) => [c.id, c]));
 
-export default CARS;
+const money = (v) =>
+  v >= 1000000
+    ? `$${(v / 1000000).toFixed(2)}M`
+    : `$${Math.round(v).toLocaleString('en-US')}`;
+
+/**
+ * A flat, standard average annual rate (the commonly cited long-run rule of thumb for US
+ * inflation), compounded from each car's launch year to now. This is deliberately NOT a
+ * real year-by-year CPI series — that would need a verified data point for every year back
+ * to 1948, a much bigger lift than this game's other numbers ask for, and a flat rate is
+ * transparent about exactly what it's assuming rather than quietly importing 80 years of
+ * economic history. It'll be wrong for any single year (real inflation spiked well above
+ * 3% in the late 1970s/early 1980s and ran near zero at times since), but it's consistent,
+ * and it's the same kind of back-of-envelope math most people already do in their head when
+ * they say "a dollar doesn't go as far as it used to."
+ */
+const AVERAGE_ANNUAL_INFLATION = 0.03;
+const REFERENCE_YEAR = new Date().getFullYear();
+const adjustedForInflation = (car) =>
+  car.priceUsd * (1 + AVERAGE_ANNUAL_INFLATION) ** (REFERENCE_YEAR - car.year);
+
+/**
+ * Cars whose power-per-litre figure is a fair comparison: a real engine, no battery
+ * padding the number, and not a rotary — a 1.3L twin-rotor is widely reckoned equivalent
+ * to roughly double that, so ranking one against piston engines is an argument, not a
+ * question.
+ */
+const comparablePerLitre = (car) => car.litres != null && !car.electrified && !car.rotary;
+
+/**
+ * The oldest/newest categories ask "which of these nameplates has been around longest",
+ * not "guess this exact car's model year" — so a Bentley Continental GT owner from any of
+ * its three generations can answer correctly by knowing when the Continental GT itself
+ * first launched. `firstYear` carries that date when it differs from the specific
+ * variant's `year`; most cars don't need it because the two are the same.
+ */
+const ageValue = (c) => c.firstYear ?? c.year;
+
+/** Excluded from age categories only: see `disputedOrigin` above. */
+const hasUndisputedOrigin = (car) => !car.disputedOrigin;
+
+/** Generic display used by the round engine: title/subtitle/meta replace make/model/year. */
+const display = (c) => ({ title: c.model, subtitle: c.make, meta: c.year });
+
+/** Cars this category can actually rank. */
+export const eligibleCars = (category, cars) =>
+  category.eligible ? cars.filter(category.eligible) : cars;
+
+const CATEGORIES = [
+  {
+    key: 'fastest',
+    axis: 'accelSec',
+    dir: 'asc',
+    value: (c) => c.accelSec,
+    title: 'Quickest first',
+    prompt: 'Quickest 0–100 km/h at the top',
+    statLabel: '0–100 km/h',
+    format: (v) => `${v.toFixed(1)}s`,
+    minRelGap: 0.1,
+    note: 'Sprint to 100 km/h (62 mph).',
+  },
+  {
+    key: 'topspeed',
+    axis: 'topSpeedMph',
+    dir: 'desc',
+    value: (c) => c.topSpeedMph,
+    title: 'Highest top speed first',
+    prompt: 'Highest top speed at the top',
+    statLabel: 'Top speed',
+    format: (v) => `${v} mph`,
+    minRelGap: 0.07,
+    note: 'Manufacturer figures.',
+  },
+  {
+    key: 'power',
+    axis: 'hp',
+    dir: 'desc',
+    value: (c) => c.hp,
+    title: 'Most powerful first',
+    prompt: 'Most horsepower at the top',
+    statLabel: 'Power',
+    format: (v) => `${v} hp`,
+    minRelGap: 0.12,
+  },
+  {
+    key: 'powertoweight',
+    axis: 'ptw',
+    dir: 'desc',
+    value: (c) => (c.hp / c.kg) * 1000,
+    title: 'Best power-to-weight first',
+    prompt: 'Best power-to-weight at the top',
+    statLabel: 'Power per tonne',
+    format: (v) => `${Math.round(v)} hp/t`,
+    minRelGap: 0.12,
+    note: 'Horsepower per tonne.',
+  },
+  {
+    key: 'bigengine',
+    axis: 'litres',
+    dir: 'desc',
+    value: (c) => c.litres,
+    eligible: (c) => c.litres != null,
+    title: 'Biggest engine first',
+    prompt: 'Biggest engine at the top',
+    statLabel: 'Displacement',
+    format: (v) => `${v.toFixed(1)}L`,
+    minRelGap: 0.12,
+  },
+  {
+    key: 'powerperlitre',
+    axis: 'perlitre',
+    dir: 'desc',
+    value: (c) => c.hp / c.litres,
+    eligible: comparablePerLitre,
+    title: 'Most highly strung first',
+    prompt: 'Most power per litre at the top',
+    statLabel: 'Power per litre',
+    format: (v) => `${Math.round(v)} hp/L`,
+    minRelGap: 0.14,
+    note: 'How hard the engine works for its size.',
+  },
+  {
+    key: 'expensive',
+    axis: 'priceUsd',
+    dir: 'desc',
+    value: (c) => c.priceUsd,
+    title: 'Most expensive first — NOT inflation-adjusted',
+    prompt: 'Highest launch-day sticker price at the top',
+    statLabel: 'Price when new',
+    format: money,
+    minRelGap: 0.2,
+    note: 'The actual number on the window sticker the day it launched — in that year’s dollars, not adjusted for inflation.',
+  },
+  {
+    key: 'cheapest',
+    axis: 'priceUsd',
+    dir: 'asc',
+    value: (c) => c.priceUsd,
+    title: 'Cheapest first — NOT inflation-adjusted',
+    prompt: 'Lowest launch-day sticker price at the top',
+    statLabel: 'Price when new',
+    format: money,
+    minRelGap: 0.2,
+    note: 'The actual number on the window sticker the day it launched — in that year’s dollars, not adjusted for inflation.',
+  },
+  {
+    key: 'expensiveAdjusted',
+    axis: 'priceUsd',
+    dir: 'desc',
+    value: adjustedForInflation,
+    title: `Most expensive first — ADJUSTED to ${REFERENCE_YEAR} dollars`,
+    prompt: `Adjusted to what it'd cost in ${REFERENCE_YEAR}, priciest at the top`,
+    statLabel: `Price in ${REFERENCE_YEAR} dollars`,
+    format: money,
+    minRelGap: 0.2,
+    note: `Launch price compounded at a flat ${Math.round(AVERAGE_ANNUAL_INFLATION * 100)}%/year`,
+  },
+  {
+    key: 'heaviest',
+    axis: 'kg',
+    dir: 'desc',
+    value: (c) => c.kg,
+    title: 'Heaviest first',
+    prompt: 'Heaviest at the top',
+    statLabel: 'Curb weight',
+    format: (v) => `${v.toLocaleString('en-US')} kg`,
+    minRelGap: 0.08,
+  },
+  {
+    key: 'lightest',
+    axis: 'kg',
+    dir: 'asc',
+    value: (c) => c.kg,
+    title: 'Lightest first',
+    prompt: 'Lightest at the top',
+    statLabel: 'Curb weight',
+    format: (v) => `${v.toLocaleString('en-US')} kg`,
+    minRelGap: 0.08,
+  },
+  {
+    key: 'oldest',
+    axis: 'year',
+    dir: 'asc',
+    value: ageValue,
+    eligible: hasUndisputedOrigin,
+    title: 'First released longest ago',
+    prompt: 'Whichever nameplate launched first goes at the top',
+    statLabel: 'First released',
+    format: (v) => String(v),
+    minAbsGap: 4,
+    hidesMeta: true,
+    note: 'About when the nameplate itself first launched.',
+  },
+  {
+    key: 'newest',
+    axis: 'year',
+    dir: 'desc',
+    value: ageValue,
+    eligible: hasUndisputedOrigin,
+    title: 'Most recently released',
+    prompt: 'Whichever nameplate launched most recently goes at the top',
+    statLabel: 'First released',
+    format: (v) => String(v),
+    minAbsGap: 4,
+    hidesMeta: true,
+    note: 'About when the nameplate itself first launched.',
+  },
+];
+
+export const cars = {
+  key: 'cars',
+  name: 'Cars',
+  items: CARS,
+  display,
+  categories: CATEGORIES.map((c) => ({ ...c, fqKey: `cars:${c.key}`, deckKey: 'cars', deckName: 'Cars', pool: CARS, display })),
+};
+
+export default cars;

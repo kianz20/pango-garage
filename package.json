@@ -1,9 +1,9 @@
 {
-  "name": "pango-garage",
+  "name": "pangorankr",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Ranking Lineup — a 5-minute party game that tests car knowledge",
+  "description": "PangoRankr — a 5-minute party ranking game",
   "engines": {
     "node": ">=18"
   },

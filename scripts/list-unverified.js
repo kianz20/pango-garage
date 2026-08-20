@@ -5,7 +5,7 @@
  *   node scripts/list-unverified.js           list everything unverified
  *   node scripts/list-unverified.js 20        list a random 20 of them (for one session)
  */
-import { CARS } from '../shared/cars.js';
+import { CARS } from '../shared/decks/cars.js';
 
 const count = Number(process.argv[2]);
 const unverified = CARS.filter((c) => !c.verified);

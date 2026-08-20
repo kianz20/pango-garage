@@ -1,11 +1,11 @@
 /**
- * Sanity checks for the car pool, the round generator, and the scoring function.
+ * Sanity checks for every deck's item pool, the round generator, and the scoring function.
  *
  * Run with `npm run verify`. Exits non-zero on any failure, so it works as a pre-deploy
  * gate — a bad lineup is only visible at a party otherwise.
  */
-import { CARS } from '../shared/cars.js';
-import { CATEGORIES, CATEGORY_BY_KEY, eligibleCars } from '../shared/categories.js';
+import { CARS } from '../shared/decks/cars.js';
+import { DECKS, ALL_CATEGORIES, CATEGORY_BY_FQKEY } from '../shared/decks/index.js';
 import { buildRounds, LINEUP_SIZE } from '../shared/rounds.js';
 import { scoreSubmission, pairCount } from '../shared/scoring.js';
 
@@ -16,7 +16,7 @@ const fail = (msg) => {
 };
 const pass = (msg) => console.log(`  ✓ ${msg}`);
 
-// ---------------------------------------------------------------- pool integrity
+// ---------------------------------------------------------------- car pool integrity
 
 console.log(`\nCar pool (${CARS.length} cars)`);
 
@@ -90,21 +90,6 @@ for (const car of CARS) {
 }
 if (failures === 0) pass(`every car has complete, plausible, mutually consistent specs`);
 
-for (const category of CATEGORIES) {
-  const usable = eligibleCars(category, CARS);
-  const distinct = new Set(usable.map((c) => category.value(c))).size;
-  if (usable.length < LINEUP_SIZE * 4) {
-    fail(`${category.key}: only ${usable.length} eligible cars`);
-  }
-  if (distinct < LINEUP_SIZE * 4) {
-    fail(`${category.key}: only ${distinct} distinct values — not enough spread`);
-  }
-  if (usable.some((c) => !Number.isFinite(category.value(c)))) {
-    fail(`${category.key}: produces a non-finite value for at least one eligible car`);
-  }
-}
-pass(`all ${CATEGORIES.length} categories have enough eligible cars and distinct values`);
-
 const evs = CARS.filter((c) => c.litres === null);
 const hybrids = CARS.filter((c) => c.electrified && c.litres !== null);
 console.log(
@@ -126,72 +111,150 @@ console.log(
     `(run \`node scripts/list-unverified.js\` to sample the rest)`
 );
 
+// ---------------------------------------------------------------- every deck: generic checks
+
+console.log(`\nAll decks (${DECKS.length} decks, ${ALL_CATEGORIES.length} categories)`);
+
+for (const deck of DECKS) {
+  const pools = new Map(); // pool identity -> {items, display}, since categories may not share one pool
+  for (const category of deck.categories) {
+    pools.set(category.pool, { items: category.pool, display: category.display });
+  }
+
+  for (const { items: pool, display } of pools.values()) {
+    const ids = new Set();
+    for (const item of pool) {
+      if (!item.id) fail(`${deck.key}: an item is missing an id`);
+      if (ids.has(item.id)) fail(`${deck.key}: duplicate id ${item.id}`);
+      ids.add(item.id);
+
+      if (typeof item.fame !== 'number' || item.fame < 1 || item.fame > 5) {
+        fail(`${deck.key}: ${item.id}.fame is missing or out of 1..5`);
+      }
+    }
+  }
+
+  for (const category of deck.categories) {
+    const usable = category.eligible ? category.pool.filter(category.eligible) : category.pool;
+
+    // A lineup only ever draws from one group at a time (see shared/rounds.js), so two
+    // same-displaying items in DIFFERENT groups (or excluded by `eligible`) can never
+    // actually appear together — only duplicates within the same eventual lineup pool
+    // matter. For an ungrouped category that pool is everything eligible; for a grouped
+    // one it's each group in isolation.
+    const buckets = category.groupKey
+      ? [...usable.reduce((m, it) => {
+          const k = category.groupKey(it);
+          (m.get(k) ?? m.set(k, []).get(k)).push(it);
+          return m;
+        }, new Map()).values()]
+      : [usable];
+    for (const bucket of buckets) {
+      const displays = new Set();
+      for (const item of bucket) {
+        const d = category.display(item);
+        const key = `${d.title}|${d.subtitle ?? ''}`.toLowerCase();
+        if (displays.has(key)) fail(`${category.fqKey}: two items display identically (${d.title})`);
+        displays.add(key);
+      }
+    }
+
+    const distinct = new Set(usable.map((it) => category.value(it))).size;
+    // `minEligible` overrides the usual floor for categories drawing on an inherently small,
+    // fixed set of real-world editions (e.g. FIFA World Cups since 1998) — there's no more
+    // spread to ask for, they're already all the officially recorded years there are.
+    const floor = category.minEligible ?? LINEUP_SIZE * (category.groupKey ? 1 : 4);
+    if (usable.length < floor) {
+      fail(`${category.fqKey}: only ${usable.length} eligible items`);
+    }
+    if (!category.groupKey && distinct < floor) {
+      fail(`${category.fqKey}: only ${distinct} distinct values — not enough spread`);
+    }
+    if (usable.some((it) => !Number.isFinite(category.value(it)))) {
+      fail(`${category.fqKey}: produces a non-finite value for at least one eligible item`);
+    }
+  }
+}
+pass(`all ${ALL_CATEGORIES.length} categories have well-formed, sufficiently spread item pools`);
+
 // ---------------------------------------------------------------- round generation
 
 const GAMES = 500;
 const ROUNDS_PER_GAME = 8;
-console.log(`\nRound generation (${GAMES} games × ${ROUNDS_PER_GAME} rounds)`);
 
-const categoryUse = new Map();
-let shortGames = 0;
-let carAppearances = new Map();
+function checkGames({ label, categoryKeys }) {
+  console.log(`\nRound generation — ${label} (${GAMES} games × ${ROUNDS_PER_GAME} rounds)`);
 
-for (let g = 0; g < GAMES; g++) {
-  const rounds = buildRounds({ count: ROUNDS_PER_GAME });
-  if (rounds.length !== ROUNDS_PER_GAME) shortGames++;
+  const categoryUse = new Map();
+  let shortGames = 0;
+  const itemAppearances = new Map();
 
-  const usedInGame = new Set();
-  rounds.forEach((round, i) => {
-    const category = CATEGORY_BY_KEY.get(round.categoryKey);
-    if (!category) return fail(`round ${i} has unknown category ${round.categoryKey}`);
-    categoryUse.set(category.key, (categoryUse.get(category.key) ?? 0) + 1);
+  for (let g = 0; g < GAMES; g++) {
+    const rounds = buildRounds({ count: ROUNDS_PER_GAME, categoryKeys });
+    if (rounds.length !== ROUNDS_PER_GAME) shortGames++;
 
-    if (round.cars.length !== LINEUP_SIZE) fail(`round ${i} has ${round.cars.length} cars`);
-    if (round.correctOrder.length !== LINEUP_SIZE) fail(`round ${i} answer is malformed`);
+    const usedInGame = new Set();
+    rounds.forEach((round, i) => {
+      const category = CATEGORY_BY_FQKEY.get(round.categoryKey);
+      if (!category) return fail(`round ${i} has unknown category ${round.categoryKey}`);
+      categoryUse.set(category.fqKey, (categoryUse.get(category.fqKey) ?? 0) + 1);
 
-    for (const car of round.cars) {
-      if (usedInGame.has(car.id)) fail(`${car.id} appears twice in one game`);
-      usedInGame.add(car.id);
-      carAppearances.set(car.id, (carAppearances.get(car.id) ?? 0) + 1);
-    }
+      if (round.items.length !== LINEUP_SIZE) fail(`round ${i} has ${round.items.length} items`);
+      if (round.correctOrder.length !== LINEUP_SIZE) fail(`round ${i} answer is malformed`);
 
-    // Every car in the lineup must be one this category can actually rank.
-    if (category.eligible && !round.cars.every(category.eligible)) {
-      fail(`round ${i} (${category.key}) includes a car the category cannot rank`);
-    }
+      for (const item of round.items) {
+        if (usedInGame.has(item.id)) fail(`${item.id} appears twice in one game`);
+        usedInGame.add(item.id);
+        itemAppearances.set(item.id, (itemAppearances.get(item.id) ?? 0) + 1);
+      }
 
-    // The answer must actually be sorted by the category's value.
-    const values = round.correctOrder.map((id) =>
-      category.value(round.cars.find((c) => c.id === id))
-    );
-    const ordered = values.every((v, j) =>
-      j === 0 ? true : category.dir === 'asc' ? v > values[j - 1] : v < values[j - 1]
-    );
-    if (!ordered) fail(`round ${i} (${category.key}) answer is not correctly sorted`);
+      // Every item in the lineup must be one this category can actually rank.
+      if (category.eligible && !round.items.every(category.eligible)) {
+        fail(`round ${i} (${category.fqKey}) includes an item the category cannot rank`);
+      }
 
-    if (category.axis === 'year' && round.cars.some((c) => c.disputedOrigin)) {
-      fail(`round ${i} (${category.key}) includes a disputedOrigin car`);
-    }
+      // A grouped category (FIFA's final-four) must only ever mix items from one group.
+      if (category.groupKey) {
+        const groups = new Set(round.items.map(category.groupKey));
+        if (groups.size !== 1) fail(`round ${i} (${category.fqKey}) mixes more than one group`);
+      }
 
-    if (i > 0) {
-      const prev = CATEGORY_BY_KEY.get(rounds[i - 1].categoryKey);
-      if (prev.axis === category.axis) fail(`rounds ${i - 1}/${i} both read ${category.axis}`);
-    }
-  });
+      // The answer must actually be sorted by the category's value.
+      const values = round.correctOrder.map((id) =>
+        category.value(round.items.find((it) => it.id === id))
+      );
+      const ordered = values.every((v, j) =>
+        j === 0 ? true : category.dir === 'asc' ? v > values[j - 1] : v < values[j - 1]
+      );
+      if (!ordered) fail(`round ${i} (${category.fqKey}) answer is not correctly sorted`);
+
+      if (category.key === 'oldest' || category.key === 'newest') {
+        if (round.items.some((it) => it.disputedOrigin)) {
+          fail(`round ${i} (${category.fqKey}) includes a disputedOrigin car`);
+        }
+      }
+
+      if (i > 0) {
+        const prev = CATEGORY_BY_FQKEY.get(rounds[i - 1].categoryKey);
+        if (prev.axis === category.axis) fail(`rounds ${i - 1}/${i} both read ${category.axis}`);
+      }
+    });
+  }
+
+  if (shortGames) fail(`${shortGames} games came up short of ${ROUNDS_PER_GAME} rounds`);
+  else pass(`all ${GAMES} games produced ${ROUNDS_PER_GAME} full rounds`);
+  pass('answers are correctly sorted, no item repeats within a game, no repeated stat back-to-back');
+
+  const usedCategories = [...categoryUse.entries()].sort((a, b) => b[1] - a[1]);
+  console.log(
+    '  categories used:',
+    usedCategories.map(([k, n]) => `${k} ${Math.round((n / (GAMES * ROUNDS_PER_GAME)) * 100)}%`).join(', ')
+  );
+  console.log(`  pool coverage: ${itemAppearances.size} distinct items appeared across ${GAMES} games`);
 }
 
-if (shortGames) fail(`${shortGames} games came up short of ${ROUNDS_PER_GAME} rounds`);
-else pass(`all ${GAMES} games produced ${ROUNDS_PER_GAME} full rounds`);
-pass('answers are correctly sorted, no car repeats within a game, no repeated stat back-to-back');
-
-const usedCategories = [...categoryUse.entries()].sort((a, b) => b[1] - a[1]);
-console.log(
-  '  categories used:',
-  usedCategories.map(([k, n]) => `${k} ${Math.round((n / (GAMES * ROUNDS_PER_GAME)) * 100)}%`).join(', ')
-);
-console.log(
-  `  pool coverage: ${carAppearances.size}/${CARS.length} cars appeared across ${GAMES} games`
-);
+checkGames({ label: 'default (cars only)', categoryKeys: undefined });
+checkGames({ label: 'mixed (every category)', categoryKeys: ALL_CATEGORIES.map((c) => c.fqKey) });
 
 // ---------------------------------------------------------------- scoring
 

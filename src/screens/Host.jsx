@@ -5,6 +5,7 @@ import Timer from '../components/Timer.jsx';
 import Reveal from '../components/Reveal.jsx';
 import Leaderboard from '../components/Leaderboard.jsx';
 import { navigate } from '../router.js';
+import { CATEGORY_GROUPS, DEFAULT_CATEGORY_KEYS } from '../../shared/decks/index.js';
 
 export default function Host() {
   const [state, setState] = useState(null);
@@ -12,7 +13,28 @@ export default function Host() {
   const [reveal, setReveal] = useState(null);
   const [over, setOver] = useState(null);
   const [error, setError] = useState(null);
+  const [selectedKeys, setSelectedKeys] = useState(() => new Set(DEFAULT_CATEGORY_KEYS));
   const claimed = useRef(false);
+
+  const toggleCategory = (fqKey) => {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(fqKey)) next.delete(fqKey);
+      else next.add(fqKey);
+      return next;
+    });
+  };
+
+  const toggleGroup = (group, allSelected) => {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      for (const c of group.categories) {
+        if (allSelected) next.delete(c.fqKey);
+        else next.add(c.fqKey);
+      }
+      return next;
+    });
+  };
 
   // Claim or reclaim a room. A host reload should land back in the same game rather than
   // stranding a room full of phones.
@@ -81,7 +103,7 @@ export default function Host() {
   }, []);
 
   const start = async () => {
-    const res = await ask('host:start');
+    const res = await ask('host:start', { categoryKeys: [...selectedKeys] });
     if (res.error) setError(res.error);
   };
 
@@ -133,7 +155,7 @@ export default function Host() {
           >
             ← Back
           </button>
-          <p className="eyebrow">Pango Garage</p>
+          <p className="eyebrow">PangoRankr</p>
           <h1>Scan to join</h1>
         </header>
 
@@ -155,10 +177,44 @@ export default function Host() {
                 ))}
               </ul>
             )}
+
+            <h2>Categories</h2>
+            <div className="category-picker">
+              {CATEGORY_GROUPS.map((group) => {
+                const allSelected = group.categories.every((c) => selectedKeys.has(c.fqKey));
+                return (
+                  <div key={group.key} className="category-picker__group">
+                    <label className="category-picker__group-head">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        onChange={() => toggleGroup(group, allSelected)}
+                      />
+                      <strong>{group.name}</strong>
+                    </label>
+                    <ul className="category-picker__list">
+                      {group.categories.map((c) => (
+                        <li key={c.fqKey}>
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={selectedKeys.has(c.fqKey)}
+                              onChange={() => toggleCategory(c.fqKey)}
+                            />
+                            {c.title}
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })}
+            </div>
+
             <button
               className="btn btn--primary btn--lg"
               onClick={start}
-              disabled={state.players.length === 0}
+              disabled={state.players.length === 0 || selectedKeys.size === 0}
             >
               Start · {state.totalRounds} rounds
             </button>
@@ -241,13 +297,13 @@ export default function Host() {
 
         <div className="host-round__body">
           <ul className="lineup">
-            {round.cars.map((car) => (
-              <li key={car.id} className="lineup__card">
-                <span className="lineup__make">{car.make}</span>
-                <span className="lineup__model">
-                  {car.model}
-                  {car.year != null && (
-                    <span className="lineup__year"> · {car.year}</span>
+            {round.items.map((item) => (
+              <li key={item.id} className="lineup__card">
+                {item.subtitle != null && <span className="lineup__subtitle">{item.subtitle}</span>}
+                <span className="lineup__title">
+                  {item.title}
+                  {item.meta != null && (
+                    <span className="lineup__meta"> · {item.meta}</span>
                   )}
                 </span>
               </li>

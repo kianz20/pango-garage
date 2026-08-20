@@ -11,19 +11,19 @@ export default function Reveal({ reveal, results, maxPairs }) {
     <div className="reveal">
       <p className="eyebrow">The answer · {reveal.statLabel}</p>
       <ol className="reveal__list">
-        {reveal.correctOrder.map((car, i) => (
-          <li key={car.id} className="reveal__row" style={{ animationDelay: `${i * 220}ms` }}>
+        {reveal.correctOrder.map((item, i) => (
+          <li key={item.id} className="reveal__row" style={{ animationDelay: `${i * 220}ms` }}>
             <span className="reveal__pos">{POSITION_LABELS[i]}</span>
-            <span className="reveal__car">
-              <span className="reveal__make">{car.make}</span>
-              <span className="reveal__model">
-                {car.model}
-                {car.year != null && (
-                  <span className="reveal__year"> ’{String(car.year).slice(2)}</span>
+            <span className="reveal__item">
+              {item.subtitle != null && <span className="reveal__subtitle">{item.subtitle}</span>}
+              <span className="reveal__title">
+                {item.title}
+                {item.meta != null && (
+                  <span className="reveal__meta"> ’{String(item.meta).slice(2)}</span>
                 )}
               </span>
             </span>
-            <span className="reveal__value">{car.value}</span>
+            <span className="reveal__value">{item.value}</span>
           </li>
         ))}
       </ol>

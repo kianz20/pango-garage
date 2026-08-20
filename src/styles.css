@@ -1,4 +1,4 @@
-/* Pango Garage — dark, high-contrast, readable from the back of a room. */
+/* PangoRankr — dark, high-contrast, readable from the back of a room. */
 
 :root {
   --bg: #0d0f14;
@@ -322,6 +322,40 @@ h2 {
   color: var(--accent);
 }
 
+.category-picker {
+  display: grid;
+  gap: 10px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.category-picker__group {
+  background: var(--bg-raised-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+.category-picker__group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.category-picker__list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0 0 0 24px;
+  display: grid;
+  gap: 4px;
+}
+.category-picker__list label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
 @keyframes pop {
   from {
     transform: scale(0.8);
@@ -383,19 +417,19 @@ h2 {
   display: grid;
   gap: 2px;
 }
-.lineup__make {
+.lineup__subtitle {
   color: var(--text-dim);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   font-size: clamp(0.75rem, 1.1vw, 0.95rem);
   font-weight: 700;
 }
-.lineup__model {
+.lineup__title {
   font-size: clamp(1.3rem, 2.6vw, 2.2rem);
   font-weight: 700;
   letter-spacing: -0.02em;
 }
-.lineup__year {
+.lineup__meta {
   color: var(--text-dim);
   font-weight: 500;
   font-size: 0.7em;
@@ -486,22 +520,22 @@ h2 {
   color: var(--accent);
   width: 2.2em;
 }
-.rank-row__car {
+.rank-row__item {
   display: grid;
   min-width: 0;
 }
-.rank-row__make {
+.rank-row__subtitle {
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--text-dim);
   font-weight: 700;
 }
-.rank-row__model {
+.rank-row__title {
   font-size: 1.05rem;
   font-weight: 700;
 }
-.rank-row__year {
+.rank-row__meta {
   color: var(--text-dim);
   font-weight: 500;
   font-size: 0.85em;
@@ -663,22 +697,22 @@ h2 {
   font-size: 0.8rem;
   color: var(--accent);
 }
-.compare__car {
+.compare__item {
   display: grid;
   min-width: 0;
 }
-.compare__make {
+.compare__subtitle {
   font-size: 0.66rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--text-dim);
   font-weight: 700;
 }
-.compare__model {
+.compare__title {
   font-weight: 700;
   font-size: 1rem;
 }
-.compare__year {
+.compare__meta {
   color: var(--text-dim);
   font-weight: 500;
 }
@@ -757,22 +791,22 @@ h2 {
   font-weight: 800;
   color: var(--accent);
 }
-.reveal__car {
+.reveal__item {
   display: grid;
   min-width: 0;
 }
-.reveal__make {
+.reveal__subtitle {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--text-dim);
   font-weight: 700;
 }
-.reveal__model {
+.reveal__title {
   font-size: clamp(1.1rem, 2.2vw, 1.8rem);
   font-weight: 700;
 }
-.reveal__year {
+.reveal__meta {
   color: var(--text-dim);
   font-weight: 500;
 }

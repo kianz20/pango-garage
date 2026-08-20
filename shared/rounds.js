@@ -1,5 +1,4 @@
-import { CARS } from './cars.js';
-import { CATEGORIES, CATEGORY_BY_KEY, eligibleCars } from './categories.js';
+import { CATEGORY_BY_FQKEY, DEFAULT_CATEGORY_KEYS } from './decks/index.js';
 
 export const LINEUP_SIZE = 4;
 
@@ -12,14 +11,18 @@ function shuffle(arr, rand = Math.random) {
   return arr;
 }
 
-const sortByCategory = (cars, category) => {
+const sortByCategory = (items, category) => {
   const sign = category.dir === 'asc' ? 1 : -1;
-  return [...cars].sort((a, b) => sign * (category.value(a) - category.value(b)));
+  return [...items].sort((a, b) => sign * (category.value(a) - category.value(b)));
 };
+
+/** Items a category can actually rank. */
+const eligibleItems = (category, items) =>
+  category.eligible ? items.filter(category.eligible) : items;
 
 /**
  * Are all adjacent pairs separated enough that the ordering is unambiguous?
- * Guards against lineups where two cars are 3 hp apart and the "right" answer is really
+ * Guards against lineups where two items are barely apart and the "right" answer is really
  * a coin flip given how approximate the pool's numbers are.
  */
 function wellSeparated(sorted, category, slack = 1) {
@@ -38,12 +41,12 @@ function wellSeparated(sorted, category, slack = 1) {
 }
 
 /**
- * Pick one lineup for a category.
+ * Pick one lineup for a category that draws from its own pool.
  *
  * Tries hard for a lineup that is famous enough and cleanly separated, then relaxes both
  * constraints rather than failing — a slightly tighter round beats no round.
  */
-function pickLineup({ category, pool, minFame, rand, attempts = 400 }) {
+function pickLineup({ category, used, minFame, rand, attempts = 400 }) {
   const relaxations = [
     { fame: minFame, slack: 1 },
     { fame: minFame, slack: 0.6 },
@@ -51,11 +54,37 @@ function pickLineup({ category, pool, minFame, rand, attempts = 400 }) {
     { fame: 1, slack: 0.3 },
   ];
 
-  // A category can only draw from cars it can rank — no displacement round for EVs.
-  const rankable = eligibleCars(category, pool);
+  const rankable = eligibleItems(category, category.pool).filter((it) => !used.has(it.id));
+
+  // A grouped category (FIFA/rugby's final-four, the Olympics medal categories) only ever
+  // compares items from the SAME group — e.g. the same World Cup year, or the same Olympic
+  // Games — so a round never mixes, say, one country's 2016 medal count against another's
+  // 2024 one. See shared/decks/fifa.js for why that also avoids stage ties.
+  if (category.groupKey) {
+    const groups = new Map();
+    for (const item of rankable) {
+      const key = category.groupKey(item);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(item);
+    }
+    const candidateGroups = [...groups.values()].filter((g) => g.length >= LINEUP_SIZE);
+    for (const { fame, slack } of relaxations) {
+      const groupsAtFame = candidateGroups.filter((g) => g.some((it) => it.fame >= fame));
+      if (groupsAtFame.length === 0) continue;
+      for (let i = 0; i < attempts; i++) {
+        const group = shuffle([...groupsAtFame], rand)[0];
+        const eligibleInGroup = group.filter((it) => it.fame >= fame);
+        if (eligibleInGroup.length < LINEUP_SIZE) continue;
+        const picked = shuffle([...eligibleInGroup], rand).slice(0, LINEUP_SIZE);
+        const sorted = sortByCategory(picked, category);
+        if (wellSeparated(sorted, category, slack)) return sorted;
+      }
+    }
+    return null;
+  }
 
   for (const { fame, slack } of relaxations) {
-    const candidates = rankable.filter((c) => c.fame >= fame);
+    const candidates = rankable.filter((it) => it.fame >= fame);
     if (candidates.length < LINEUP_SIZE) continue;
     for (let i = 0; i < attempts; i++) {
       const picked = shuffle([...candidates], rand).slice(0, LINEUP_SIZE);
@@ -71,17 +100,17 @@ function pickLineup({ category, pool, minFame, rand, attempts = 400 }) {
  * two categories reading the same axis back to back (heaviest then lightest is a cheap
  * gotcha, not a good round).
  */
-function buildSchedule(count, rand) {
+function buildSchedule(count, rand, categories) {
   const schedule = [];
   let bag = [];
   while (schedule.length < count) {
-    if (bag.length === 0) bag = shuffle([...CATEGORIES], rand);
+    if (bag.length === 0) bag = shuffle([...categories], rand);
     const prev = schedule[schedule.length - 1];
     let idx = bag.findIndex((c) => !prev || c.axis !== prev.axis);
     if (idx === -1) {
       // The bag is down to categories that would repeat the previous axis. Top it up from
       // a fresh shuffle rather than accepting the repeat; the leftovers stay in play.
-      bag = shuffle([...bag, ...CATEGORIES], rand);
+      bag = shuffle([...bag, ...categories], rand);
       idx = bag.findIndex((c) => c.axis !== prev.axis);
       if (idx === -1) idx = 0; // only reachable if every category shares one axis
     }
@@ -90,33 +119,42 @@ function buildSchedule(count, rand) {
   return schedule;
 }
 
+/** Resolve the host's chosen fully-qualified category keys, falling back to the default set. */
+function resolveCategories(categoryKeys) {
+  const resolved = (categoryKeys ?? [])
+    .map((k) => CATEGORY_BY_FQKEY.get(k))
+    .filter(Boolean);
+  if (resolved.length >= 2) return resolved;
+  return DEFAULT_CATEGORY_KEYS.map((k) => CATEGORY_BY_FQKEY.get(k));
+}
+
 /**
  * Generate a whole game's worth of rounds.
  *
- * Difficulty ramps by loosening the fame floor: early rounds use cars everybody knows,
- * later rounds reach into the pool's deeper cuts. No car appears twice in one game.
+ * Difficulty ramps by loosening the fame floor: early rounds use items everybody knows,
+ * later rounds reach into the pool's deeper cuts. No item appears twice in one game.
  *
- * @returns {Array<{index:number, categoryKey:string, cars:object[], correctOrder:string[]}>}
+ * @returns {Array<{index:number, categoryKey:string, items:object[], correctOrder:string[]}>}
  */
-export function buildRounds({ count = 8, rand = Math.random, cars = CARS } = {}) {
-  const schedule = buildSchedule(count, rand);
+export function buildRounds({ count = 8, rand = Math.random, categoryKeys } = {}) {
+  const categories = resolveCategories(categoryKeys);
+  const schedule = buildSchedule(count, rand, categories);
   const used = new Set();
   const rounds = [];
 
   schedule.forEach((category, index) => {
     // 5,5,4,4,3,3,2,2... for an 8-round game.
     const minFame = Math.max(2, 5 - Math.floor((index * 4) / Math.max(1, count)));
-    const pool = cars.filter((c) => !used.has(c.id));
-    const lineup = pickLineup({ category, pool, minFame, rand });
+    const lineup = pickLineup({ category, used, minFame, rand });
     if (!lineup) return;
 
-    lineup.forEach((c) => used.add(c.id));
+    lineup.forEach((it) => used.add(it.id));
     rounds.push({
       index,
-      categoryKey: category.key,
+      categoryKey: category.fqKey,
       // Display order is shuffled so position on screen leaks nothing.
-      cars: shuffle([...lineup], rand),
-      correctOrder: lineup.map((c) => c.id),
+      items: shuffle([...lineup], rand),
+      correctOrder: lineup.map((it) => it.id),
     });
   });
 
@@ -126,57 +164,58 @@ export function buildRounds({ count = 8, rand = Math.random, cars = CARS } = {})
 /**
  * The client-safe view of a round: no stat values, so nothing to inspect in devtools.
  *
- * The year is included UNLESS the round is actually about age (oldest/newest) — hiding it
- * there is the whole point of that category, but hiding it everywhere else only makes a
- * nameplate that spans multiple eras (e.g. "Continental GT" spans three generations across
- * 2003-2025 with very different specs) impossible to answer: the player has no way to know
- * which real car is meant. Showing the year outside age rounds fixes that for free, since
- * year isn't the thing being tested there.
+ * `meta` is included UNLESS the category is flagged `hidesMeta` — cars' oldest/newest and
+ * FIFA's "year won" ranking are literally asking for that value, so showing it would hand
+ * over the answer. Everywhere else, meta (e.g. a car's model year, a phone's release year)
+ * exists to disambiguate a title that could otherwise mean more than one real thing.
  */
 export function publicRound(round, { totalRounds, endsAt, durationMs }) {
-  const category = CATEGORY_BY_KEY.get(round.categoryKey);
-  const showYear = category.axis !== 'year';
+  const category = CATEGORY_BY_FQKEY.get(round.categoryKey);
+  const showMeta = !category.hidesMeta;
   return {
     index: round.index,
     totalRounds,
     endsAt,
     durationMs,
     category: {
-      key: category.key,
+      key: category.fqKey,
       title: category.title,
       prompt: category.prompt,
       statLabel: category.statLabel,
       note: category.note,
     },
-    cars: round.cars.map((c) => ({
-      id: c.id,
-      make: c.make,
-      model: c.model,
-      ...(showYear ? { year: c.year } : {}),
-    })),
+    items: round.items.map((it) => {
+      const d = category.display(it);
+      return {
+        id: it.id,
+        title: d.title,
+        ...(d.subtitle != null ? { subtitle: d.subtitle } : {}),
+        ...(showMeta && d.meta != null ? { meta: d.meta } : {}),
+      };
+    }),
   };
 }
 
 /** The reveal view: now with the answer and the numbers behind it. */
 export function revealRound(round) {
-  const category = CATEGORY_BY_KEY.get(round.categoryKey);
-  const byId = new Map(round.cars.map((c) => [c.id, c]));
-  // On an age round the "value" column already shows the release year, so repeating a
-  // (possibly different) variant year next to the model name would read as a contradiction
-  // — e.g. "Escalade '07 ... 1999" — rather than as extra context.
-  const showVariantYear = category.axis !== 'year';
+  const category = CATEGORY_BY_FQKEY.get(round.categoryKey);
+  const byId = new Map(round.items.map((it) => [it.id, it]));
+  // On a hidesMeta round the "value" column already shows the meta (e.g. the year), so
+  // repeating it next to the title would read as redundant rather than as extra context.
+  const showMeta = !category.hidesMeta;
   return {
     index: round.index,
     categoryKey: round.categoryKey,
     statLabel: category.statLabel,
     correctOrder: round.correctOrder.map((id) => {
-      const car = byId.get(id);
+      const item = byId.get(id);
+      const d = category.display(item);
       return {
         id,
-        make: car.make,
-        model: car.model,
-        year: showVariantYear ? car.year : null,
-        value: category.format(category.value(car)),
+        title: d.title,
+        subtitle: d.subtitle ?? null,
+        meta: showMeta ? d.meta ?? null : null,
+        value: category.format(category.value(item)),
       };
     }),
   };

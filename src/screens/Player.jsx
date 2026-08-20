@@ -105,7 +105,7 @@ export default function Player({ initialCode = '' }) {
       setReveal(null);
       setOver(null);
       setRound(payload);
-      setOrder(payload.cars.map((c) => c.id));
+      setOrder(payload.items.map((it) => it.id));
       lockedRef.current = false;
       setLocked(false);
       setSentOrder(null);
@@ -174,7 +174,7 @@ export default function Player({ initialCode = '' }) {
           >
             ← Back
           </button>
-          <p className="eyebrow">Pango Garage</p>
+          <p className="eyebrow">PangoRankr</p>
           <h1>Join the game</h1>
 
           <label className="field">
@@ -228,7 +228,7 @@ export default function Player({ initialCode = '' }) {
         <Timer endsAt={round.endsAt} durationMs={round.durationMs} label={locked ? 'Locked in' : 'Drag to order'} />
 
         <RankList
-          cars={round.cars}
+          items={round.items}
           order={locked && sentOrder ? sentOrder : order}
           onChange={setOrder}
           disabled={locked}

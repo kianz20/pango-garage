@@ -187,9 +187,9 @@ export function markDisconnected(room, socketId) {
 
 // ---------------------------------------------------------------- game flow
 
-export function startGame(room) {
+export function startGame(room, { categoryKeys } = {}) {
   if (room.phase === 'round' || room.phase === 'reveal') return;
-  room.rounds = buildRounds({ count: CONFIG.totalRounds });
+  room.rounds = buildRounds({ count: CONFIG.totalRounds, categoryKeys });
   room.roundIndex = -1;
   for (const p of room.players.values()) p.score = 0;
   nextRound(room);

@@ -5,7 +5,7 @@ export default function Landing() {
   return (
     <main className="shell shell--center">
       <div className="landing">
-        <p className="landing__blurb">Pango Garage</p>
+        <p className="landing__blurb">PangoRankr</p>
         <h1 className="landing__title">
           Four cars.
           <br />
