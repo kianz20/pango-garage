@@ -96,25 +96,65 @@ function pickLineup({ category, used, minFame, rand, attempts = 400 }) {
 }
 
 /**
- * Build a category schedule: varied, never the same category twice in a row, and never
- * two categories reading the same axis back to back (heaviest then lightest is a cheap
- * gotcha, not a good round).
+ * Build a category schedule.
+ *
+ * Odds are per SELECTED TOPIC, not per category — a shuffle-bag of topics is drawn from
+ * first, refilling only once every topic has had a turn, so Cars' 13 categories don't
+ * crowd out Food & Drink's 1 just because there are more of them. Within whichever topic
+ * comes up, its own categories cycle the same shuffle-bag way. Never the same category
+ * twice in a row, and never two categories reading the same axis back to back (heaviest
+ * then lightest is a cheap gotcha, not a good round).
  */
 function buildSchedule(count, rand, categories) {
+  const byDeck = new Map();
+  for (const c of categories) {
+    if (!byDeck.has(c.deckKey)) byDeck.set(c.deckKey, []);
+    byDeck.get(c.deckKey).push(c);
+  }
+  const deckKeys = [...byDeck.keys()];
+  const categoryBags = new Map(deckKeys.map((k) => [k, []]));
+  const refill = (deckKey) => shuffle([...byDeck.get(deckKey)], rand);
+
   const schedule = [];
-  let bag = [];
+  let deckBag = [];
+
   while (schedule.length < count) {
-    if (bag.length === 0) bag = shuffle([...categories], rand);
     const prev = schedule[schedule.length - 1];
-    let idx = bag.findIndex((c) => !prev || c.axis !== prev.axis);
-    if (idx === -1) {
-      // The bag is down to categories that would repeat the previous axis. Top it up from
-      // a fresh shuffle rather than accepting the repeat; the leftovers stay in play.
-      bag = shuffle([...bag, ...categories], rand);
-      idx = bag.findIndex((c) => c.axis !== prev.axis);
-      if (idx === -1) idx = 0; // only reachable if every category shares one axis
+    if (deckBag.length === 0) deckBag = shuffle([...deckKeys], rand);
+
+    // Try each topic currently in the bag (without consuming the ones we skip) for one
+    // whose next category avoids repeating prev's axis.
+    let picked = null;
+    for (let i = 0; i < deckBag.length && !picked; i++) {
+      const deckKey = deckBag[i];
+      let bag = categoryBags.get(deckKey);
+      if (bag.length === 0) bag = refill(deckKey);
+      let idx = bag.findIndex((c) => !prev || c.axis !== prev.axis);
+      if (idx === -1) {
+        // This topic's current cycle is down to axis-repeating options — give it a fresh
+        // cycle before ruling it out for this round entirely.
+        bag = shuffle([...bag, ...byDeck.get(deckKey)], rand);
+        idx = bag.findIndex((c) => c.axis !== prev.axis);
+      }
+      if (idx !== -1) {
+        const [category] = bag.splice(idx, 1);
+        categoryBags.set(deckKey, bag);
+        deckBag.splice(i, 1);
+        picked = category;
+      }
     }
-    schedule.push(...bag.splice(idx, 1));
+
+    if (!picked) {
+      // Only reachable if every selected category, across every topic, shares one axis.
+      const deckKey = deckBag.shift();
+      let bag = categoryBags.get(deckKey);
+      if (bag.length === 0) bag = refill(deckKey);
+      const [category] = bag.splice(0, 1);
+      categoryBags.set(deckKey, bag);
+      picked = category;
+    }
+
+    schedule.push(picked);
   }
   return schedule;
 }

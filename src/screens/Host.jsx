@@ -5,12 +5,7 @@ import Timer from '../components/Timer.jsx';
 import Reveal from '../components/Reveal.jsx';
 import Leaderboard from '../components/Leaderboard.jsx';
 import { navigate } from '../router.js';
-import { CATEGORY_GROUPS, DEFAULT_CATEGORY_KEYS } from '../../shared/decks/index.js';
-
-// What topic the default category set (today's cars-only behaviour) belongs to.
-const DEFAULT_DECK_KEY = CATEGORY_GROUPS.find((g) =>
-  g.categories.some((c) => DEFAULT_CATEGORY_KEYS.includes(c.fqKey))
-)?.key;
+import { CATEGORY_GROUPS } from '../../shared/decks/index.js';
 
 export default function Host() {
   const [state, setState] = useState(null);
@@ -18,7 +13,9 @@ export default function Host() {
   const [reveal, setReveal] = useState(null);
   const [over, setOver] = useState(null);
   const [error, setError] = useState(null);
-  const [selectedDecks, setSelectedDecks] = useState(() => new Set([DEFAULT_DECK_KEY]));
+  const [selectedDecks, setSelectedDecks] = useState(
+    () => new Set(CATEGORY_GROUPS.map((g) => g.key))
+  );
   const claimed = useRef(false);
 
   const toggleDeck = (deckKey) => {
