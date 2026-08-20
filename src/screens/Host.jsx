@@ -7,31 +7,25 @@ import Leaderboard from '../components/Leaderboard.jsx';
 import { navigate } from '../router.js';
 import { CATEGORY_GROUPS, DEFAULT_CATEGORY_KEYS } from '../../shared/decks/index.js';
 
+// What topic the default category set (today's cars-only behaviour) belongs to.
+const DEFAULT_DECK_KEY = CATEGORY_GROUPS.find((g) =>
+  g.categories.some((c) => DEFAULT_CATEGORY_KEYS.includes(c.fqKey))
+)?.key;
+
 export default function Host() {
   const [state, setState] = useState(null);
   const [round, setRound] = useState(null);
   const [reveal, setReveal] = useState(null);
   const [over, setOver] = useState(null);
   const [error, setError] = useState(null);
-  const [selectedKeys, setSelectedKeys] = useState(() => new Set(DEFAULT_CATEGORY_KEYS));
+  const [selectedDecks, setSelectedDecks] = useState(() => new Set([DEFAULT_DECK_KEY]));
   const claimed = useRef(false);
 
-  const toggleCategory = (fqKey) => {
-    setSelectedKeys((prev) => {
+  const toggleDeck = (deckKey) => {
+    setSelectedDecks((prev) => {
       const next = new Set(prev);
-      if (next.has(fqKey)) next.delete(fqKey);
-      else next.add(fqKey);
-      return next;
-    });
-  };
-
-  const toggleGroup = (group, allSelected) => {
-    setSelectedKeys((prev) => {
-      const next = new Set(prev);
-      for (const c of group.categories) {
-        if (allSelected) next.delete(c.fqKey);
-        else next.add(c.fqKey);
-      }
+      if (next.has(deckKey)) next.delete(deckKey);
+      else next.add(deckKey);
       return next;
     });
   };
@@ -103,7 +97,10 @@ export default function Host() {
   }, []);
 
   const start = async () => {
-    const res = await ask('host:start', { categoryKeys: [...selectedKeys] });
+    const categoryKeys = CATEGORY_GROUPS.filter((g) => selectedDecks.has(g.key)).flatMap((g) =>
+      g.categories.map((c) => c.fqKey)
+    );
+    const res = await ask('host:start', { categoryKeys });
     if (res.error) setError(res.error);
   };
 
@@ -179,42 +176,25 @@ export default function Host() {
             )}
 
             <h2>Categories</h2>
-            <div className="category-picker">
-              {CATEGORY_GROUPS.map((group) => {
-                const allSelected = group.categories.every((c) => selectedKeys.has(c.fqKey));
-                return (
-                  <div key={group.key} className="category-picker__group">
-                    <label className="category-picker__group-head">
-                      <input
-                        type="checkbox"
-                        checked={allSelected}
-                        onChange={() => toggleGroup(group, allSelected)}
-                      />
-                      <strong>{group.name}</strong>
-                    </label>
-                    <ul className="category-picker__list">
-                      {group.categories.map((c) => (
-                        <li key={c.fqKey}>
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={selectedKeys.has(c.fqKey)}
-                              onChange={() => toggleCategory(c.fqKey)}
-                            />
-                            {c.title}
-                          </label>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                );
-              })}
-            </div>
+            <ul className="category-picker">
+              {CATEGORY_GROUPS.map((group) => (
+                <li key={group.key} className="category-picker__group">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={selectedDecks.has(group.key)}
+                      onChange={() => toggleDeck(group.key)}
+                    />
+                    {group.name}
+                  </label>
+                </li>
+              ))}
+            </ul>
 
             <button
               className="btn btn--primary btn--lg"
               onClick={start}
-              disabled={state.players.length === 0 || selectedKeys.size === 0}
+              disabled={state.players.length === 0 || selectedDecks.size === 0}
             >
               Start · {state.totalRounds} rounds
             </button>
