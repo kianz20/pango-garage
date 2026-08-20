@@ -45,8 +45,19 @@ export const WORLDCUP_FINALISTS = [
   ...finalFour(2022, 'Qatar', 5, ['Argentina', 'France', 'Croatia', 'Morocco']),
 ];
 
-const editionDisplay = (e) => ({ title: e.championTeam, subtitle: e.host, meta: e.year });
-const finalistDisplay = (f) => ({ title: f.team, subtitle: `${f.year} World Cup`, meta: null });
+// Labeled explicitly rather than two bare country names — a lineup card otherwise shows
+// e.g. "South Korea / Japan" above "Brazil" with nothing to say which one hosted and
+// which one actually won.
+const editionDisplay = (e) => ({
+  title: `Won by ${e.championTeam}`,
+  subtitle: `Hosted by ${e.host}`,
+  meta: e.year,
+});
+const finalistDisplay = (f) => ({
+  title: f.team,
+  subtitle: `${f.year} FIFA World Cup, hosted by ${f.host}${f.place === 1 ? ' (winner)' : ''}`,
+  meta: null,
+});
 
 const CATEGORIES = [
   {
@@ -54,8 +65,8 @@ const CATEGORIES = [
     axis: 'year',
     dir: 'asc',
     value: (e) => e.year,
-    title: 'Earliest World Cup win first',
-    prompt: 'Whichever World Cup happened first goes at the top',
+    title: 'Earliest FIFA World Cup win first',
+    prompt: 'Whichever FIFA World Cup happened first goes at the top',
     statLabel: 'Year won',
     format: (v) => String(v),
     minAbsGap: 2,
@@ -63,7 +74,7 @@ const CATEGORIES = [
     hidesMeta: true,
     pool: WORLDCUP_EDITIONS,
     display: editionDisplay,
-    note: 'Ranked by the year that World Cup was played.',
+    note: 'Ranked by the year that FIFA World Cup was played.',
   },
   {
     key: 'finalfour',
@@ -71,8 +82,8 @@ const CATEGORIES = [
     dir: 'asc',
     value: (f) => f.place,
     groupKey: (f) => f.year,
-    title: 'Closest to winning first',
-    prompt: 'From that World Cup: champion down to 4th place',
+    title: 'Closest to winning the FIFA World Cup first',
+    prompt: 'From that FIFA World Cup: champion down to 4th place',
     statLabel: 'Final placing',
     format: (v) => ['Champion', 'Runner-up', '3rd place', '4th place'][v - 1],
     minAbsGap: 1,
