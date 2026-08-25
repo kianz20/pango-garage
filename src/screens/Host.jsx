@@ -31,6 +31,26 @@ export default function Host() {
   // stranding a room full of phones.
   useEffect(() => {
     const claim = async () => {
+      // A hub (e.g. PangoGaming) handing off a voted-in lobby lands here with ?autohost=1
+      // and asks to be told the freshly-created code, so it can redirect players straight
+      // into it instead of making them scan a second QR code.
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('autohost') === '1') {
+        const created = await ask('host:create');
+        if (created.error) return setError(created.error);
+        setState(created.state);
+        saveSession({ hostCode: created.state.code });
+        const notify = params.get('notify');
+        if (notify) {
+          fetch(notify, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: created.state.code }),
+          }).catch(() => {});
+        }
+        return;
+      }
+
       const existing = loadSession().hostCode;
       if (existing) {
         const resumed = await ask('host:resume', { code: existing });

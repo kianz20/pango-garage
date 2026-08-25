@@ -98,6 +98,22 @@ export default function Player({ initialCode = '' }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // A hub (e.g. PangoGaming) handing off a voted-in lobby lands here with the room already
+  // pre-known and a stable playerId in the URL, so this player slots straight into the
+  // reconnect path in joinRoom() instead of typing a name that was already collected.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pid = params.get('pid');
+    const handoffName = params.get('name');
+    if (!pid || !handoffName || !initialCode) return;
+
+    const onConnect = () => join({ code: initialCode, name: handoffName, playerId: pid });
+    if (socket.connected) onConnect();
+    socket.on('connect', onConnect);
+    return () => socket.off('connect', onConnect);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialCode]);
+
   useEffect(() => {
     const onState = (s) => setState(s);
     const onRoundStart = (payload) => {
