@@ -55,7 +55,7 @@ const editionDisplay = (e) => ({
 });
 const finalistDisplay = (f) => ({
   title: f.team,
-  subtitle: `${f.year} FIFA World Cup, hosted by ${f.host}${f.place === 1 ? ' (winner)' : ''}`,
+  subtitle: `${f.year} FIFA World Cup, hosted by ${f.host}`,
   meta: null,
 });
 
@@ -66,7 +66,7 @@ const CATEGORIES = [
     dir: 'asc',
     value: (e) => e.year,
     title: 'Earliest FIFA World Cup win first',
-    prompt: 'Whichever FIFA World Cup happened first goes at the top',
+    prompt: 'Whichever FIFA World Cup happened first goes at the top (1998 onward)',
     statLabel: 'Year won',
     format: (v) => String(v),
     minAbsGap: 2,
@@ -74,7 +74,7 @@ const CATEGORIES = [
     hidesMeta: true,
     pool: WORLDCUP_EDITIONS,
     display: editionDisplay,
-    note: 'Ranked by the year that FIFA World Cup was played.',
+    note: 'Ranked by the year that FIFA World Cup was played (1998 onward).',
   },
   {
     key: 'finalfour',
@@ -83,13 +83,13 @@ const CATEGORIES = [
     value: (f) => f.place,
     groupKey: (f) => f.year,
     title: 'Closest to winning the FIFA World Cup first',
-    prompt: 'From that FIFA World Cup: champion down to 4th place',
+    prompt: 'From that FIFA World Cup (1998 onward): champion down to 4th place',
     statLabel: 'Final placing',
     format: (v) => ['Champion', 'Runner-up', '3rd place', '4th place'][v - 1],
     minAbsGap: 1,
     pool: WORLDCUP_FINALISTS,
     display: finalistDisplay,
-    note: 'The actual Final Four of one World Cup: champion, runner-up, 3rd and 4th place.',
+    note: 'The actual Final Four of one World Cup (1998 onward): champion, runner-up, 3rd and 4th place.',
   },
 ];
 

@@ -1,4 +1,4 @@
-import { CATEGORY_BY_FQKEY, DEFAULT_CATEGORY_KEYS } from './decks/index.js';
+import { CATEGORY_BY_FQKEY, DEFAULT_CATEGORY_KEYS, TOPIC_KEY_BY_FQKEY } from './decks/index.js';
 
 export const LINEUP_SIZE = 4;
 
@@ -100,57 +100,60 @@ function pickLineup({ category, used, minFame, rand, attempts = 400 }) {
  *
  * Odds are per SELECTED TOPIC, not per category — a shuffle-bag of topics is drawn from
  * first, refilling only once every topic has had a turn, so Cars' 13 categories don't
- * crowd out Food & Drink's 1 just because there are more of them. Within whichever topic
- * comes up, its own categories cycle the same shuffle-bag way. Never the same category
- * twice in a row, and never two categories reading the same axis back to back (heaviest
- * then lightest is a cheap gotcha, not a good round).
+ * crowd out Food & Drink's 1 just because there are more of them. A topic can span more
+ * than one deck (FIFA and Rugby both count as "Sports", see shared/decks/index.js), so this
+ * groups by `topicKey`, not `deckKey`. Within whichever topic comes up, its own categories
+ * cycle the same shuffle-bag way. Never the same category twice in a row, and never two
+ * categories reading the same axis back to back (heaviest then lightest is a cheap gotcha,
+ * not a good round).
  */
 function buildSchedule(count, rand, categories) {
-  const byDeck = new Map();
+  const byTopic = new Map();
   for (const c of categories) {
-    if (!byDeck.has(c.deckKey)) byDeck.set(c.deckKey, []);
-    byDeck.get(c.deckKey).push(c);
+    const topicKey = TOPIC_KEY_BY_FQKEY.get(c.fqKey);
+    if (!byTopic.has(topicKey)) byTopic.set(topicKey, []);
+    byTopic.get(topicKey).push(c);
   }
-  const deckKeys = [...byDeck.keys()];
-  const categoryBags = new Map(deckKeys.map((k) => [k, []]));
-  const refill = (deckKey) => shuffle([...byDeck.get(deckKey)], rand);
+  const topicKeys = [...byTopic.keys()];
+  const categoryBags = new Map(topicKeys.map((k) => [k, []]));
+  const refill = (topicKey) => shuffle([...byTopic.get(topicKey)], rand);
 
   const schedule = [];
-  let deckBag = [];
+  let topicBag = [];
 
   while (schedule.length < count) {
     const prev = schedule[schedule.length - 1];
-    if (deckBag.length === 0) deckBag = shuffle([...deckKeys], rand);
+    if (topicBag.length === 0) topicBag = shuffle([...topicKeys], rand);
 
     // Try each topic currently in the bag (without consuming the ones we skip) for one
     // whose next category avoids repeating prev's axis.
     let picked = null;
-    for (let i = 0; i < deckBag.length && !picked; i++) {
-      const deckKey = deckBag[i];
-      let bag = categoryBags.get(deckKey);
-      if (bag.length === 0) bag = refill(deckKey);
+    for (let i = 0; i < topicBag.length && !picked; i++) {
+      const topicKey = topicBag[i];
+      let bag = categoryBags.get(topicKey);
+      if (bag.length === 0) bag = refill(topicKey);
       let idx = bag.findIndex((c) => !prev || c.axis !== prev.axis);
       if (idx === -1) {
         // This topic's current cycle is down to axis-repeating options — give it a fresh
         // cycle before ruling it out for this round entirely.
-        bag = shuffle([...bag, ...byDeck.get(deckKey)], rand);
+        bag = shuffle([...bag, ...byTopic.get(topicKey)], rand);
         idx = bag.findIndex((c) => c.axis !== prev.axis);
       }
       if (idx !== -1) {
         const [category] = bag.splice(idx, 1);
-        categoryBags.set(deckKey, bag);
-        deckBag.splice(i, 1);
+        categoryBags.set(topicKey, bag);
+        topicBag.splice(i, 1);
         picked = category;
       }
     }
 
     if (!picked) {
       // Only reachable if every selected category, across every topic, shares one axis.
-      const deckKey = deckBag.shift();
-      let bag = categoryBags.get(deckKey);
-      if (bag.length === 0) bag = refill(deckKey);
+      const topicKey = topicBag.shift();
+      let bag = categoryBags.get(topicKey);
+      if (bag.length === 0) bag = refill(topicKey);
       const [category] = bag.splice(0, 1);
-      categoryBags.set(deckKey, bag);
+      categoryBags.set(topicKey, bag);
       picked = category;
     }
 

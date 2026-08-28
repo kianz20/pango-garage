@@ -1,6 +1,9 @@
 /**
- * The film & music deck: two separate pools sharing one file since each category only
- * reads one of them (movies for box office/budget/runtime, albums for sales).
+ * The film & music deck: two pools sharing one file. Most categories read only one of them
+ * (movies for box office/budget/runtime, albums for sales), but the three "release year"
+ * categories also include a third, `MOVIES_AND_ALBUMS`, that mixes both pools together so a
+ * round can ask "which of these came out first" across movies and albums at once — ids are
+ * prefixed `movie-`/`album-` so they never collide when combined.
  *
  * Movies and albums are limited to well-known titles only, per the game's design intent —
  * an obscure box-office figure would be an unguessable trivia question, not a ranking
@@ -73,6 +76,11 @@ const money = (v) => `$${v.toLocaleString('en-US')}M`;
 
 const movieDisplay = (m) => ({ title: m.title, subtitle: m.studio, meta: m.releaseYear });
 const albumDisplay = (a) => ({ title: a.title, subtitle: a.artist, meta: a.releaseYear });
+// A movie and an album never share an `artist`/`studio` field, so this picks whichever one
+// the item actually has to label it correctly in a mixed movies+albums lineup.
+const filmMusicDisplay = (item) => ({ title: item.title, subtitle: item.studio ?? item.artist, meta: item.releaseYear });
+
+const MOVIES_AND_ALBUMS = [...MOVIES, ...ALBUMS];
 
 const CATEGORIES = [
   {
@@ -129,6 +137,51 @@ const CATEGORIES = [
     pool: ALBUMS,
     display: albumDisplay,
     note: 'Estimated career sales of the album, worldwide.',
+  },
+  {
+    key: 'movieyear',
+    axis: 'movieYear',
+    dir: 'asc',
+    value: (m) => m.releaseYear,
+    title: 'Oldest movie first',
+    prompt: 'Whichever movie came out first goes at the top',
+    statLabel: 'Released',
+    format: (v) => String(v),
+    minAbsGap: 1,
+    hidesMeta: true,
+    pool: MOVIES,
+    display: movieDisplay,
+    note: 'Ranked by theatrical release year.',
+  },
+  {
+    key: 'albumyear',
+    axis: 'albumYear',
+    dir: 'asc',
+    value: (a) => a.releaseYear,
+    title: 'Oldest album first',
+    prompt: 'Whichever album came out first goes at the top',
+    statLabel: 'Released',
+    format: (v) => String(v),
+    minAbsGap: 1,
+    hidesMeta: true,
+    pool: ALBUMS,
+    display: albumDisplay,
+    note: 'Ranked by original release year.',
+  },
+  {
+    key: 'filmmusicyear',
+    axis: 'filmMusicYear',
+    dir: 'asc',
+    value: (item) => item.releaseYear,
+    title: 'Oldest movie or album first',
+    prompt: 'Whichever movie or album came out first goes at the top',
+    statLabel: 'Released',
+    format: (v) => String(v),
+    minAbsGap: 1,
+    hidesMeta: true,
+    pool: MOVIES_AND_ALBUMS,
+    display: filmMusicDisplay,
+    note: 'Movies and albums mixed together, ranked by release year.',
   },
 ];
 

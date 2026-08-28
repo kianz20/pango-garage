@@ -321,14 +321,6 @@ const adjustedForInflation = (car) =>
   car.priceUsd * (1 + AVERAGE_ANNUAL_INFLATION) ** (REFERENCE_YEAR - car.year);
 
 /**
- * Cars whose power-per-litre figure is a fair comparison: a real engine, no battery
- * padding the number, and not a rotary — a 1.3L twin-rotor is widely reckoned equivalent
- * to roughly double that, so ranking one against piston engines is an argument, not a
- * question.
- */
-const comparablePerLitre = (car) => car.litres != null && !car.electrified && !car.rotary;
-
-/**
  * The oldest/newest categories ask "which of these nameplates has been around longest",
  * not "guess this exact car's model year" — so a Bentley Continental GT owner from any of
  * its three generations can answer correctly by knowing when the Continental GT itself
@@ -384,18 +376,6 @@ const CATEGORIES = [
     minRelGap: 0.12,
   },
   {
-    key: 'powertoweight',
-    axis: 'ptw',
-    dir: 'desc',
-    value: (c) => (c.hp / c.kg) * 1000,
-    title: 'Best power-to-weight first',
-    prompt: 'Best power-to-weight at the top',
-    statLabel: 'Power per tonne',
-    format: (v) => `${Math.round(v)} hp/t`,
-    minRelGap: 0.12,
-    note: 'Horsepower per tonne.',
-  },
-  {
     key: 'bigengine',
     axis: 'litres',
     dir: 'desc',
@@ -406,19 +386,6 @@ const CATEGORIES = [
     statLabel: 'Displacement',
     format: (v) => `${v.toFixed(1)}L`,
     minRelGap: 0.12,
-  },
-  {
-    key: 'powerperlitre',
-    axis: 'perlitre',
-    dir: 'desc',
-    value: (c) => c.hp / c.litres,
-    eligible: comparablePerLitre,
-    title: 'Most highly strung first',
-    prompt: 'Most power per litre at the top',
-    statLabel: 'Power per litre',
-    format: (v) => `${Math.round(v)} hp/L`,
-    minRelGap: 0.14,
-    note: 'How hard the engine works for its size.',
   },
   {
     key: 'expensive',
